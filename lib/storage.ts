@@ -10,15 +10,28 @@ export type StorageCategory = "assets" | "exports" | "qa" | "vpat";
 type StorageBackend = "local" | "s3";
 
 const storageBackend: StorageBackend = normalizedStorageBackend();
-const s3Region = cleanEnv(process.env.APP_AWS_REGION) || cleanEnv(process.env.AWS_REGION);
-const s3Bucket = cleanEnv(process.env.APP_S3_BUCKET) || cleanEnv(process.env.AWS_S3_BUCKET);
+const defaultAwsAccountId = "863518440691";
+const s3Region = cleanEnv(process.env.APP_AWS_REGION) || cleanEnv(process.env.AWS_REGION) || "ap-northeast-2";
+
+function inferBucketFromDdbTable(): string {
+  const projectsTable = cleanEnv(process.env.DDB_PROJECTS_TABLE);
+  if (!projectsTable || !projectsTable.endsWith("-projects")) return "";
+  const prefix = projectsTable.slice(0, -"-projects".length);
+  const accountId = cleanEnv(process.env.APP_AWS_ACCOUNT_ID) || cleanEnv(process.env.AWS_ACCOUNT_ID) || defaultAwsAccountId;
+  return `${prefix}-${accountId}-assets`;
+}
+
+const s3Bucket = cleanEnv(process.env.APP_S3_BUCKET) || cleanEnv(process.env.AWS_S3_BUCKET) || inferBucketFromDdbTable();
 const s3Prefix = (cleanEnv(process.env.APP_S3_PREFIX) || cleanEnv(process.env.AWS_S3_PREFIX)).replace(/^\/+|\/+$/g, "");
 
 let cachedS3: S3Client | null = null;
 
 function assertS3Config(): void {
   if (!s3Region || !s3Bucket) {
-    throw new Error("S3 storage is enabled but APP_AWS_REGION/APP_S3_BUCKET env is missing.");
+    throw new Error(
+      `S3 storage is enabled but config is missing (resolved region='${s3Region}', bucket='${s3Bucket}'). ` +
+        "Set APP_AWS_REGION/APP_S3_BUCKET."
+    );
   }
 }
 
