@@ -87,25 +87,54 @@ function deriveTableName(projectsTable: string, suffix: string): string {
   return `${projectsTable}-${suffix}`;
 }
 
-function inferProjectsTableName(): string {
+function inferTablePrefixFromBucket(): string {
   const fromBucket = readCleanEnv("APP_S3_BUCKET");
   if (!fromBucket) return "";
   const stripped = fromBucket.endsWith("-assets") ? fromBucket.slice(0, -"-assets".length) : fromBucket;
   const suffix = "-863518440691";
   if (stripped.endsWith(suffix)) {
-    return `${stripped.slice(0, -suffix.length)}-projects`;
+    return stripped.slice(0, -suffix.length);
   }
-  return `${stripped}-projects`;
+  return stripped;
+}
+
+function inferTablePrefix(): string {
+  const explicitPrefix = readCleanEnv("DDB_TABLE_PREFIX");
+  if (explicitPrefix) return explicitPrefix;
+
+  const fromProjects = readCleanEnv("DDB_PROJECTS_TABLE");
+  if (fromProjects && fromProjects.endsWith("-projects")) {
+    return fromProjects.slice(0, -"-projects".length);
+  }
+
+  const fromBucket = inferTablePrefixFromBucket();
+  if (fromBucket) return fromBucket;
+
+  // Final fallback for this project's Terraform naming convention.
+  return "flowtutor-prod";
+}
+
+function inferProjectsTableName(): string {
+  const prefix = inferTablePrefix();
+  return prefix ? `${prefix}-projects` : "";
 }
 
 function getConfig(): DdbConfig {
   if (cachedConfig) return cachedConfig;
 
   const projectsTable = readCleanEnv("DDB_PROJECTS_TABLE") || inferProjectsTableName();
-  const stepsTable = readCleanEnv("DDB_STEPS_TABLE") || (projectsTable ? deriveTableName(projectsTable, "steps") : "");
-  const assetsTable = readCleanEnv("DDB_ASSETS_TABLE") || (projectsTable ? deriveTableName(projectsTable, "assets-meta") : "");
+  const tablePrefix = inferTablePrefix();
+  const stepsTable = readCleanEnv("DDB_STEPS_TABLE") || (projectsTable ? deriveTableName(projectsTable, "steps") : `${tablePrefix}-steps`);
+  const assetsTable =
+    readCleanEnv("DDB_ASSETS_TABLE") || (projectsTable ? deriveTableName(projectsTable, "assets-meta") : `${tablePrefix}-assets-meta`);
   if (!projectsTable || !stepsTable || !assetsTable) {
-    throw new Error("DB_BACKEND=dynamodb requires DDB_PROJECTS_TABLE, DDB_STEPS_TABLE, DDB_ASSETS_TABLE.");
+    throw new Error(
+      [
+        "DynamoDB table config missing.",
+        `resolved: projects='${projectsTable}', steps='${stepsTable}', assets='${assetsTable}'.`,
+        "required env: DDB_PROJECTS_TABLE, DDB_STEPS_TABLE, DDB_ASSETS_TABLE."
+      ].join(" ")
+    );
   }
 
   cachedConfig = {
