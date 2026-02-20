@@ -1,31 +1,30 @@
-import path from "node:path";
-import fs from "node:fs/promises";
 import { NextResponse } from "next/server";
 import { generateTutorialFromAssets, synthesizeStepVoice } from "@/lib/openai";
 import { getOrCreateSampleProject } from "@/lib/sample";
 import { addAsset, getProject, listAssets, replaceSteps, setProjectStatus, setStepTtsAsset } from "@/lib/repo";
+import { writeStorageObject } from "@/lib/storage";
 import { getProjectView } from "@/lib/view";
-import { assetDir } from "@/lib/paths";
 
 export const runtime = "nodejs";
 
 export async function POST(_: Request, { params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
-  const project = getProject(projectId);
+  const project = await getProject(projectId);
   if (!project) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
-  const assets = listAssets(projectId).filter((a) => a.kind === "image");
+  const assets = (await listAssets(projectId)).filter((a) => a.kind === "image");
   if (!assets.length) {
     return NextResponse.json({ error: "No image assets to generate from" }, { status: 400 });
   }
 
-  setProjectStatus(projectId, "generating");
+  await setProjectStatus(projectId, "generating");
 
   try {
-    const tutorial = await generateTutorialFromAssets(assets);
-    const steps = replaceSteps(projectId, tutorial, assets.map((a) => a.id));
+    const workflowName = project.tutorialTitle?.trim() || project.title || "업무 프로세스";
+    const tutorial = await generateTutorialFromAssets(assets, workflowName);
+    const steps = await replaceSteps(projectId, tutorial, assets);
 
     const withTts = process.env.ENABLE_TTS !== "false";
     let ttsGenerated = 0;
@@ -35,16 +34,21 @@ export async function POST(_: Request, { params }: { params: Promise<{ projectId
         try {
           const script = step.ttsScript?.trim() || step.instruction;
           const audio = await synthesizeStepVoice(script);
-          const filePath = path.join(assetDir, `${projectId}-step-${step.stepNo}.mp3`);
-          await fs.writeFile(filePath, audio);
-          const asset = addAsset({
+          const filePath = await writeStorageObject({
+            category: "assets",
+            projectId,
+            fileName: `${projectId}-step-${step.stepNo}.mp3`,
+            body: audio,
+            contentType: "audio/mpeg"
+          });
+          const asset = await addAsset({
             projectId,
             kind: "audio",
             filePath,
             mimeType: "audio/mpeg",
             sortOrder: 10000 + step.stepNo
           });
-          setStepTtsAsset(projectId, step.stepNo, asset.id);
+          await setStepTtsAsset(projectId, step.stepNo, asset.id);
           ttsGenerated += 1;
         } catch {
           // Keep tutorial usable even if some TTS generation fails.
@@ -52,11 +56,11 @@ export async function POST(_: Request, { params }: { params: Promise<{ projectId
       }
     }
 
-    setProjectStatus(projectId, "ready");
-    return NextResponse.json({ ok: true, project: getProjectView(projectId), ttsGenerated });
+    await setProjectStatus(projectId, "ready");
+    return NextResponse.json({ ok: true, project: await getProjectView(projectId), ttsGenerated });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown generation error";
-    setProjectStatus(projectId, "failed", message);
+    await setProjectStatus(projectId, "failed", message);
 
     const sampleProjectId = await getOrCreateSampleProject();
     return NextResponse.json(
@@ -64,7 +68,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ projectId
         ok: false,
         error: message,
         fallbackProjectId: sampleProjectId,
-        fallbackProject: getProjectView(sampleProjectId)
+        fallbackProject: await getProjectView(sampleProjectId)
       },
       { status: 200 }
     );

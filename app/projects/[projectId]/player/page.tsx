@@ -12,6 +12,8 @@ type ApiView = {
     title: string;
     instruction: string;
     highlight: { x: number; y: number; w: number; h: number };
+    imageWidth: number | null;
+    imageHeight: number | null;
     assetUrl: string | null;
     ttsUrl: string | null;
   }>;
@@ -59,6 +61,8 @@ export default function PlayerPage({ params }: { params: Promise<{ projectId: st
   }, [data]);
 
   const step = useMemo(() => data?.steps[idx] ?? null, [data?.steps, idx]);
+  const renderWidth = step?.imageWidth ?? imgNatural?.w ?? 1200;
+  const renderHeight = step?.imageHeight ?? imgNatural?.h ?? 800;
   const highlight = useMemo(() => {
     if (!step) return { x: 0, y: 0, w: 0, h: 0 };
     const raw = step.highlight;
@@ -75,14 +79,22 @@ export default function PlayerPage({ params }: { params: Promise<{ projectId: st
   }, [step, imgNatural]);
 
   if (!data || !step) {
-    return <main className="container">Loading player...</main>;
+    return <main className="container">플레이어 불러오는 중...</main>;
   }
 
   return (
     <main className="container grid" style={{ gap: 12 }}>
       <div className="row" style={{ justifyContent: "space-between" }}>
-        <Link href="/">← Back</Link>
-        <span className="small">키보드: ← → 이동 / ESC 닫기</span>
+        <Link href="/demo">← 뒤로</Link>
+        <div className="row">
+          <Link className="btn ghost" href={`/demo/projects/${projectId}/qa`}>
+            QA
+          </Link>
+          <Link className="btn ghost" href={`/demo/projects/${projectId}/edit`}>
+            편집기
+          </Link>
+          <span className="small">키보드: ← → 이동 / ESC 닫기</span>
+        </div>
       </div>
       <div className="brand-row">
         <span className="brand-mark" />
@@ -91,7 +103,7 @@ export default function PlayerPage({ params }: { params: Promise<{ projectId: st
       <h1>{data.project.tutorialTitle ?? data.project.title}</h1>
       <section className="player-layout">
         <aside className="card step-nav">
-          <h3>Steps</h3>
+          <h3>단계</h3>
           <div className="step-list">
             {data.steps.map((s, stepIndex) => {
               const isActive = stepIndex === idx;
@@ -105,7 +117,7 @@ export default function PlayerPage({ params }: { params: Promise<{ projectId: st
                 >
                   <span className="step-link-num">{s.stepNo}</span>
                   <span className="step-link-title">{s.title}</span>
-                  <span className={`step-link-state ${isVisited ? "visited" : ""}`}>{isVisited ? "done" : "new"}</span>
+                  <span className={`step-link-state ${isVisited ? "visited" : ""}`}>{isVisited ? "완료" : "신규"}</span>
                 </button>
               );
             })}
@@ -114,14 +126,14 @@ export default function PlayerPage({ params }: { params: Promise<{ projectId: st
 
         <div className="grid" style={{ gap: 12 }}>
           <div className="card">
-            <div className="player-image-shell">
+            <div className="player-image-shell" style={{ aspectRatio: `${renderWidth} / ${renderHeight}` }}>
               {step.assetUrl && (
                 <Image
                   src={step.assetUrl}
                   alt="step"
                   className="player-image"
-                  width={1920}
-                  height={1200}
+                  width={renderWidth}
+                  height={renderHeight}
                   unoptimized
                   onClick={() => {
                     setPreviewOpen(true);
@@ -160,14 +172,14 @@ export default function PlayerPage({ params }: { params: Promise<{ projectId: st
             )}
             <div className="row">
               <button className="btn ghost" onClick={() => setIdx((v) => Math.max(0, v - 1))} disabled={idx === 0}>
-                Back
+                이전
               </button>
               <button
                 className="btn primary"
                 onClick={() => setIdx((v) => Math.min(data.steps.length - 1, v + 1))}
                 disabled={idx === data.steps.length - 1}
               >
-                Next
+                다음
               </button>
               <span className="small">
                 {idx + 1}/{data.steps.length}
@@ -181,7 +193,7 @@ export default function PlayerPage({ params }: { params: Promise<{ projectId: st
         <div className="modal-backdrop" onClick={() => setPreviewOpen(false)} role="presentation">
           <div className="modal-panel" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Player image preview">
             <div className="row" style={{ justifyContent: "space-between", marginBottom: 8 }}>
-              <strong>Step Image Preview</strong>
+              <strong>단계 이미지 미리보기</strong>
               <div className="row">
                 <button className="btn ghost" onClick={() => setPreviewZoom((z) => Math.max(0.5, Number((z - 0.25).toFixed(2))))}>
                   -
@@ -191,15 +203,23 @@ export default function PlayerPage({ params }: { params: Promise<{ projectId: st
                   +
                 </button>
                 <button className="btn ghost" onClick={() => setPreviewZoom(1)}>
-                  Reset
+                  초기화
                 </button>
                 <button className="btn warn" onClick={() => setPreviewOpen(false)}>
-                  Close
+                  닫기
                 </button>
               </div>
             </div>
             <div className="modal-image-wrap">
-              <Image className="modal-image" src={step.assetUrl} alt="preview" width={1920} height={1200} unoptimized style={{ transform: `scale(${previewZoom})` }} />
+              <Image
+                className="modal-image"
+                src={step.assetUrl}
+                alt="preview"
+                width={renderWidth}
+                height={renderHeight}
+                unoptimized
+                style={{ transform: `scale(${previewZoom})` }}
+              />
             </div>
           </div>
         </div>

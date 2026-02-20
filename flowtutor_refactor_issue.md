@@ -22,7 +22,7 @@ A) DATA MODEL / SCHEMA CHANGES
    - (optional) bboxConfidence (0..1) or needsReview boolean
 
    Rationale:
-   Previously step_no implied screenshot order. That blocks micro-steps. Now steps can reference the same asset multiple times.
+   Previously step_no implied screenshot order. Thatlocks micro-steps. Now steps can reference the same asset multiple times.
 
 2) Store tutorial JSON in DB but normalize steps so editor/player/export use the same source of truth.
 

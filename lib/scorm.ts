@@ -1,9 +1,10 @@
 import fs from "node:fs";
 import fsp from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import archiver from "archiver";
-import { exportDir } from "@/lib/paths";
 import { getProject, listAssets, listSteps } from "@/lib/repo";
+import { readStorageObject, storageFileName, writeStorageObject } from "@/lib/storage";
 
 function buildManifest(projectId: string, title: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -241,61 +242,112 @@ function buildIndexHtml(
 }
 
 export async function buildScormZip(projectId: string): Promise<string> {
-  const project = getProject(projectId);
+  const project = await getProject(projectId);
   if (!project) {
     throw new Error("Project not found");
   }
 
-  const steps = listSteps(projectId);
-  const assets = listAssets(projectId);
+  const steps = await listSteps(projectId);
+  const assets = await listAssets(projectId);
   const byId = new Map(assets.map((a) => [a.id, a]));
 
-  const zipPath = path.join(exportDir, `${projectId}-${Date.now()}.zip`);
-  await fsp.mkdir(exportDir, { recursive: true });
+  const extFromAsset = (filePath: string, mimeType: string): string => {
+    const ext = path.extname(storageFileName(filePath)).toLowerCase();
+    if (ext) return ext;
+    if (mimeType === "image/jpeg") return ".jpg";
+    if (mimeType === "image/webp") return ".webp";
+    if (mimeType === "image/gif") return ".gif";
+    if (mimeType === "image/svg+xml") return ".svg";
+    if (mimeType === "audio/mpeg") return ".mp3";
+    return ".bin";
+  };
 
-  await new Promise<void>((resolve, reject) => {
-    const output = fs.createWriteStream(zipPath);
-    const archive = archiver("zip", { zlib: { level: 9 } });
+  const prepared: Array<{
+    title: string;
+    instruction: string;
+    highlight: { x: number; y: number; w: number; h: number };
+    assetPath: string;
+    audioPath: string | null;
+    assetBuffer: Buffer;
+    audioBuffer: Buffer | null;
+  }> = [];
+  const ordered = steps.filter((s) => s.assetId);
+  for (let i = 0; i < ordered.length; i += 1) {
+    const s = ordered[i];
+    const asset = byId.get(s.assetId as string);
+    if (!asset) {
+      throw new Error(`Missing asset for step ${s.stepNo}`);
+    }
+    const audioAsset = s.ttsAssetId ? byId.get(s.ttsAssetId) : null;
+    const ext = extFromAsset(asset.filePath, asset.mimeType);
+    const assetPath = `assets/step-${String(i + 1).padStart(2, "0")}${ext}`;
+    const assetBuffer = await readStorageObject(asset.filePath);
 
-    output.on("close", () => resolve());
-    archive.on("error", (err) => reject(err));
+    let audioPath: string | null = null;
+    let audioBuffer: Buffer | null = null;
+    if (audioAsset) {
+      const audioExt = extFromAsset(audioAsset.filePath, audioAsset.mimeType);
+      audioPath = `assets/step-${String(i + 1).padStart(2, "0")}-audio${audioExt}`;
+      audioBuffer = await readStorageObject(audioAsset.filePath);
+    }
 
-    archive.pipe(output);
+    prepared.push({
+      title: s.title,
+      instruction: s.instruction,
+      highlight: s.highlight,
+      assetPath,
+      audioPath,
+      assetBuffer,
+      audioBuffer
+    });
+  }
 
-    const scormSteps = steps
-      .filter((s) => s.assetId)
-      .map((s, i) => {
-        const asset = byId.get(s.assetId as string);
-        if (!asset) {
-          throw new Error(`Missing asset for step ${s.stepNo}`);
+  const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), "flowtutor-export-"));
+  const localZipPath = path.join(tempDir, `${projectId}-${Date.now()}.zip`);
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const output = fs.createWriteStream(localZipPath);
+      const archive = archiver("zip", { zlib: { level: 9 } });
+
+      output.on("close", () => resolve());
+      archive.on("error", (err) => reject(err));
+
+      archive.pipe(output);
+
+      const scormSteps = prepared.map((s) => ({
+        title: s.title,
+        instruction: s.instruction,
+        highlight: s.highlight,
+        assetPath: s.assetPath,
+        audioPath: s.audioPath
+      }));
+
+      for (const s of prepared) {
+        archive.append(s.assetBuffer, { name: s.assetPath });
+        if (s.audioPath && s.audioBuffer) {
+          archive.append(s.audioBuffer, { name: s.audioPath });
         }
-        const audioAsset = s.ttsAssetId ? byId.get(s.ttsAssetId) : null;
-        const ext = path.extname(asset.filePath) || ".png";
-        const assetPath = `assets/step-${String(i + 1).padStart(2, "0")}${ext}`;
-        archive.file(asset.filePath, { name: assetPath });
+      }
 
-        let audioPath: string | null = null;
-        if (audioAsset) {
-          const audioExt = path.extname(audioAsset.filePath) || ".mp3";
-          audioPath = `assets/step-${String(i + 1).padStart(2, "0")}-audio${audioExt}`;
-          archive.file(audioAsset.filePath, { name: audioPath });
-        }
+      archive.append(buildManifest(projectId, project.tutorialTitle ?? project.title), { name: "imsmanifest.xml" });
+      archive.append(scormApiJs(), { name: "scorm_api.js" });
+      archive.append(buildIndexHtml(project.tutorialTitle ?? project.title, scormSteps), { name: "index.html" });
 
-        return {
-          title: s.title,
-          instruction: s.instruction,
-          highlight: s.highlight,
-          assetPath,
-          audioPath
-        };
-      });
+      archive.finalize();
+    });
 
-    archive.append(buildManifest(projectId, project.tutorialTitle ?? project.title), { name: "imsmanifest.xml" });
-    archive.append(scormApiJs(), { name: "scorm_api.js" });
-    archive.append(buildIndexHtml(project.tutorialTitle ?? project.title, scormSteps), { name: "index.html" });
-
-    archive.finalize();
-  });
-
-  return zipPath;
+    const zipBuffer = await fsp.readFile(localZipPath);
+    const zipName = `${projectId}-${Date.now()}.zip`;
+    const locator = await writeStorageObject({
+      category: "exports",
+      projectId,
+      fileName: zipName,
+      body: zipBuffer,
+      contentType: "application/zip"
+    });
+    return locator;
+  } finally {
+    await fsp.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+  }
 }

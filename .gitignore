@@ -50,3 +50,17 @@ __pycache__/
 
 # FlowTutor local runtime data
 data/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+iac/.terraform/
+iac/.terraform.lock.hcl
+*.tfvars
+*.tfvars.json

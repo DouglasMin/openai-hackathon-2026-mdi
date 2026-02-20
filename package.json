@@ -10,9 +10,16 @@
     "verify:scorm-runtime": "node scripts/verify-scorm-runtime.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.994.0",
+    "@aws-sdk/client-s3": "^3.994.0",
+    "@aws-sdk/lib-dynamodb": "^3.994.0",
     "adm-zip": "^0.5.16",
     "archiver": "^7.0.1",
+    "axe-core": "^4.11.1",
     "better-sqlite3": "^11.7.0",
+    "cheerio": "^1.2.0",
+    "diff": "^8.0.3",
+    "image-size": "^2.0.2",
     "next": "^15.5.5",
     "openai": "^5.20.2",
     "react": "19.0.0",

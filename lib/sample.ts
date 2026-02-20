@@ -1,7 +1,5 @@
-import fs from "node:fs/promises";
-import path from "node:path";
 import { createProject, listAssets, listProjects, replaceSteps, addAsset, setProjectStatus } from "@/lib/repo";
-import { assetDir } from "@/lib/paths";
+import { writeStorageObject } from "@/lib/storage";
 import type { TutorialSchema } from "@/lib/types";
 
 function crmSvg(stepTitle: string, subtitle: string, accent: string): string {
@@ -9,7 +7,7 @@ function crmSvg(stepTitle: string, subtitle: string, accent: string): string {
 <svg xmlns="http://www.w3.org/2000/svg" width="1366" height="768" viewBox="0 0 1366 768">
   <rect width="1366" height="768" fill="#f4f7fb"/>
   <rect x="0" y="0" width="220" height="768" fill="#113355"/>
-  <text x="24" y="46" font-family="Arial" font-size="28" fill="#ffffff" font-weight="700">FlowCRM</text>
+  <text x="24" y="46" font-family="Arial" font-size="28" fill="#ffffff" font-weight="700">FlowTutor</text>
   <text x="24" y="90" font-family="Arial" font-size="17" fill="#a8c4e6">Dashboard</text>
   <text x="24" y="124" font-family="Arial" font-size="17" fill="#a8c4e6">Leads</text>
   <rect x="250" y="28" width="1088" height="80" rx="14" fill="#ffffff"/>
@@ -21,51 +19,106 @@ function crmSvg(stepTitle: string, subtitle: string, accent: string): string {
 }
 
 export async function getOrCreateSampleProject(): Promise<string> {
-  const existing = listProjects().find((p) => p.title === "Sample CRM Lead Registration");
+  const existing = (await listProjects()).find((p) => p.title === "Sample Workflow Tutorial" || p.title === "Sample CRM Lead Registration");
   if (existing) {
     return existing.id;
   }
 
-  const project = createProject("Sample CRM Lead Registration");
+  const project = await createProject("Sample Workflow Tutorial");
 
   const sampleFiles = [
     { name: "sample-1.svg", svg: crmSvg("Dashboard", "Open Leads", "#2b6cb0") },
-    { name: "sample-2.svg", svg: crmSvg("Leads", "Add Lead", "#2f855a") },
-    { name: "sample-3.svg", svg: crmSvg("Create Lead", "Required Fields", "#805ad5") },
-    { name: "sample-4.svg", svg: crmSvg("Create Lead", "Save", "#d69e2e") },
-    { name: "sample-5.svg", svg: crmSvg("Lead List", "Success Toast", "#dd6b20") },
-    { name: "sample-6.svg", svg: crmSvg("Lead List", "Verify Added", "#2c5282") }
+    { name: "sample-2.svg", svg: crmSvg("Workflow List", "Add Item", "#2f855a") },
+    { name: "sample-3.svg", svg: crmSvg("Create Item", "Required Fields", "#805ad5") },
+    { name: "sample-4.svg", svg: crmSvg("Create Item", "Save", "#d69e2e") },
+    { name: "sample-5.svg", svg: crmSvg("Item List", "Success Toast", "#dd6b20") },
+    { name: "sample-6.svg", svg: crmSvg("Item List", "Verify Added", "#2c5282") }
   ];
 
   for (let i = 0; i < sampleFiles.length; i += 1) {
     const file = sampleFiles[i];
-    const targetPath = path.join(assetDir, `${project.id}-${file.name}`);
-    await fs.writeFile(targetPath, file.svg, "utf-8");
-    addAsset({
+    const targetPath = await writeStorageObject({
+      category: "assets",
+      projectId: project.id,
+      fileName: `${project.id}-${file.name}`,
+      body: file.svg,
+      contentType: "image/svg+xml"
+    });
+    await addAsset({
       projectId: project.id,
       kind: "image",
       filePath: targetPath,
       mimeType: "image/svg+xml",
+      imageWidth: 1366,
+      imageHeight: 768,
       sortOrder: i
     });
   }
 
-  const assets = listAssets(project.id);
+  const assets = await listAssets(project.id);
 
   const tutorial: TutorialSchema = {
-    tutorial_title: "CRM 리드 등록 튜토리얼",
+    tutorial_title: "샘플 워크플로우 튜토리얼",
     language: "ko-KR",
     steps: [
-      { step_no: 1, title: "대시보드 진입", instruction: "CRM 대시보드에 진입해 현재 상태를 확인합니다.", highlight: { x: 20, y: 9, w: 18, h: 6 } },
-      { step_no: 2, title: "Leads 이동", instruction: "좌측 메뉴에서 Leads를 눌러 리드 관리 화면으로 이동합니다.", highlight: { x: 2, y: 14, w: 12, h: 5 } },
-      { step_no: 3, title: "Add Lead 클릭", instruction: "우측 상단의 Add Lead 버튼을 클릭해 등록 폼을 엽니다.", highlight: { x: 72, y: 20, w: 23, h: 8 } },
-      { step_no: 4, title: "필수 필드 입력", instruction: "이름, 회사, 이메일, 상태 등 필수 입력값을 작성합니다.", highlight: { x: 33, y: 25, w: 52, h: 45 } },
-      { step_no: 5, title: "Save 실행", instruction: "입력을 확인한 뒤 Save 버튼을 눌러 저장합니다.", highlight: { x: 72, y: 20, w: 23, h: 8 } },
-      { step_no: 6, title: "성공 여부 확인", instruction: "성공 토스트와 목록 반영 여부를 확인해 등록 완료를 검증합니다.", highlight: { x: 58, y: 20, w: 37, h: 12 } }
+      {
+        step_no: 1,
+        asset_index: 0,
+        title: "대시보드 진입",
+        instruction: "대시보드 화면에 진입해 현재 상태를 확인합니다.",
+        highlight: { x: 270, y: 32, w: 420, h: 56 },
+        tts_script: "대시보드 화면에 진입해 현재 상태를 확인합니다.",
+        notes: ""
+      },
+      {
+        step_no: 2,
+        asset_index: 1,
+        title: "목록 메뉴 이동",
+        instruction: "좌측 메뉴에서 목록 메뉴를 눌러 관리 화면으로 이동합니다.",
+        highlight: { x: 22, y: 108, w: 170, h: 30 },
+        tts_script: "좌측 메뉴에서 목록 메뉴를 눌러 이동합니다.",
+        notes: ""
+      },
+      {
+        step_no: 3,
+        asset_index: 2,
+        title: "신규 항목 추가",
+        instruction: "우측 상단의 Add Item 버튼을 클릭해 등록 폼을 엽니다.",
+        highlight: { x: 980, y: 158, w: 320, h: 56 },
+        tts_script: "우측 상단 Add Item 버튼을 클릭합니다.",
+        notes: ""
+      },
+      {
+        step_no: 4,
+        asset_index: 3,
+        title: "필수 필드 입력",
+        instruction: "이름, 회사, 이메일, 상태 등 필수 입력값을 작성합니다.",
+        highlight: { x: 340, y: 210, w: 660, h: 300 },
+        tts_script: "필수 입력값을 차례대로 작성합니다.",
+        notes: ""
+      },
+      {
+        step_no: 5,
+        asset_index: 3,
+        title: "Save 실행",
+        instruction: "입력을 확인한 뒤 Save 버튼을 눌러 저장합니다.",
+        highlight: { x: 980, y: 158, w: 320, h: 56 },
+        tts_script: "Save 버튼으로 저장합니다.",
+        notes: ""
+      },
+      {
+        step_no: 6,
+        asset_index: 5,
+        title: "성공 여부 확인",
+        instruction: "성공 토스트와 목록 반영 여부를 확인해 등록 완료를 검증합니다.",
+        highlight: { x: 790, y: 150, w: 490, h: 90 },
+        tts_script: "성공 토스트와 목록 반영 여부를 확인합니다.",
+        notes: ""
+      }
     ]
   };
 
-  replaceSteps(project.id, tutorial, assets.map((a) => a.id));
-  setProjectStatus(project.id, "ready");
+  await replaceSteps(project.id, tutorial, assets);
+  await setProjectStatus(project.id, "ready");
   return project.id;
 }

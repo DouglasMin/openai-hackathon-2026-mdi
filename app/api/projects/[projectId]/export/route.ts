@@ -1,26 +1,26 @@
-import fs from "node:fs/promises";
-import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
 import { buildScormZip } from "@/lib/scorm";
-import { addAsset, getProject, listAssets, setProjectStatus } from "@/lib/repo";
+import { addAsset, clearScormCloudRegistration, getProject, listAssets, setProjectStatus } from "@/lib/repo";
+import { readStorageObject, storageFileName } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
 export async function POST(_: NextRequest, { params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
-  if (!getProject(projectId)) {
+  if (!(await getProject(projectId))) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
-  const zipPath = await buildScormZip(projectId);
-  addAsset({
+  const zipLocator = await buildScormZip(projectId);
+  await addAsset({
     projectId,
     kind: "zip",
-    filePath: zipPath,
+    filePath: zipLocator,
     mimeType: "application/zip",
     sortOrder: Date.now()
   });
-  setProjectStatus(projectId, "exported");
+  await clearScormCloudRegistration(projectId);
+  await setProjectStatus(projectId, "exported");
 
   return NextResponse.json({
     ok: true,
@@ -30,8 +30,9 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ proje
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
-  const zips = listAssets(projectId)
+  const zips = (await listAssets(projectId))
     .filter((a) => a.kind === "zip")
+    .filter((a) => !storageFileName(a.filePath).startsWith(`qa-fix-${projectId}-`))
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 
   if (!zips.length) {
@@ -39,8 +40,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ proj
   }
 
   const latest = zips[0];
-  const file = await fs.readFile(latest.filePath);
-  const filename = path.basename(latest.filePath);
+  const file = await readStorageObject(latest.filePath);
+  const filename = storageFileName(latest.filePath);
 
   if (!req.nextUrl.searchParams.get("download")) {
     return NextResponse.json({ downloadUrl: `/api/projects/${projectId}/export?download=1`, filename });

@@ -33,6 +33,25 @@ npm install
 cp .env.example .env
 # required: OPENAI_API_KEY
 # optional: OPENAI_MODEL, ENABLE_TTS, OPENAI_TTS_MODEL, OPENAI_TTS_VOICE
+# optional (SCORM Cloud real launch/status sync):
+# SCORM_CLOUD_APP_ID
+# SCORM_CLOUD_SECRET
+# SCORM_CLOUD_BASE_URL=https://cloud.scorm.com/api/v2/
+# optional (AWS runtime):
+# STORAGE_BACKEND=s3
+# DB_BACKEND=dynamodb
+# APP_AWS_REGION
+# APP_S3_BUCKET
+# APP_S3_PREFIX
+# APP_AWS_ACCESS_KEY_ID
+# APP_AWS_SECRET_ACCESS_KEY
+# DDB_PROJECTS_TABLE
+# DDB_STEPS_TABLE
+# DDB_ASSETS_TABLE
+# DDB_SCAN_RUNS_TABLE
+# DDB_ISSUES_TABLE
+# DDB_SCORE_SUMMARY_TABLE
+# DDB_SCORM_REG_TABLE
 ```
 
 3. Run dev server
@@ -41,7 +60,7 @@ cp .env.example .env
 npm run dev
 ```
 
-Open `http://localhost:3000`.
+Open landing page at `http://localhost:3000`, and product demo at `http://localhost:3000/demo`.
 
 ## API routes
 
@@ -53,6 +72,8 @@ Open `http://localhost:3000`.
 - `POST /api/projects/[projectId]/generate`
 - `POST /api/projects/[projectId]/export`
 - `GET /api/projects/[projectId]/export?download=1`
+- `POST /api/projects/[projectId]/scorm-cloud` (upload exported zip, create registration, return launch link)
+- `GET /api/projects/[projectId]/scorm-cloud?refresh=1` (sync completed status from SCORM Cloud)
 - `GET /api/assets/[assetId]`
 
 ## OpenAI API alignment
@@ -72,3 +93,7 @@ Keep the same repository/service interfaces and replace:
 - local asset files -> S3 object storage
 - SQLite metadata -> DynamoDB or Postgres
 - host on AWS Amplify SSR for App Router + Route Handlers
+
+Current code supports storage backend switch via `STORAGE_BACKEND`:
+- `local` (default): filesystem under `data/`
+- `s3`: uses `APP_*` AWS env vars and stores assets/exports/QA artifacts/VPAT in S3

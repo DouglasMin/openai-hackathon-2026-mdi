@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
-import fs from "node:fs/promises";
 import path from "node:path";
 import AdmZip from "adm-zip";
+import { imageSize } from "image-size";
 import { NextResponse } from "next/server";
 import { getProject, addAsset, listAssets, setProjectStatus } from "@/lib/repo";
-import { assetDir } from "@/lib/paths";
+import { writeStorageObject } from "@/lib/storage";
 import { getProjectView } from "@/lib/view";
 
 export const runtime = "nodejs";
@@ -18,6 +18,11 @@ function looksLikeZip(file: File): boolean {
   return allowedZipTypes.has(file.type) || ext === ".zip";
 }
 
+function looksLikeImage(file: File): boolean {
+  const ext = path.extname(file.name).toLowerCase();
+  return allowedImageTypes.has(file.type) || allowedImageExtensions.has(ext);
+}
+
 function normalizeImageExt(name: string, mimeType: string): string {
   const ext = path.extname(name).toLowerCase();
   if (allowedImageExtensions.has(ext)) return ext;
@@ -29,9 +34,18 @@ function normalizeImageExt(name: string, mimeType: string): string {
   return ".bin";
 }
 
+function readDimensions(content: Buffer): { width: number | null; height: number | null } {
+  try {
+    const size = imageSize(content);
+    return { width: size.width ?? null, height: size.height ?? null };
+  } catch {
+    return { width: null, height: null };
+  }
+}
+
 export async function POST(req: Request, { params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
-  const project = getProject(projectId);
+  const project = await getProject(projectId);
   if (!project) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
@@ -46,22 +60,43 @@ export async function POST(req: Request, { params }: { params: Promise<{ project
     return NextResponse.json({ error: "No files uploaded" }, { status: 400 });
   }
 
-  const existing = listAssets(projectId).filter((a) => a.kind === "image").length;
+  const existing = (await listAssets(projectId)).filter((a) => a.kind === "image").length;
   let addedImages = 0;
 
   for (const file of files) {
-    if (allowedImageTypes.has(file.type)) {
-      const ext = normalizeImageExt(file.name, file.type);
+    if (looksLikeImage(file)) {
+      const normalizedType =
+        file.type && allowedImageTypes.has(file.type)
+          ? file.type
+          : path.extname(file.name).toLowerCase() === ".png"
+            ? "image/png"
+            : path.extname(file.name).toLowerCase() === ".jpg" || path.extname(file.name).toLowerCase() === ".jpeg"
+              ? "image/jpeg"
+              : path.extname(file.name).toLowerCase() === ".webp"
+                ? "image/webp"
+                : path.extname(file.name).toLowerCase() === ".gif"
+                  ? "image/gif"
+                  : "image/svg+xml";
+      const ext = normalizeImageExt(file.name, normalizedType);
       const fileName = `${projectId}-${randomUUID()}${ext}`;
-      const target = path.join(assetDir, fileName);
       const arr = await file.arrayBuffer();
-      await fs.writeFile(target, Buffer.from(arr));
+      const content = Buffer.from(arr);
+      const locator = await writeStorageObject({
+        category: "assets",
+        projectId,
+        fileName,
+        body: content,
+        contentType: normalizedType
+      });
+      const { width, height } = readDimensions(content);
 
-      addAsset({
+      await addAsset({
         projectId,
         kind: "image",
-        filePath: target,
-        mimeType: file.type,
+        filePath: locator,
+        mimeType: normalizedType,
+        imageWidth: width,
+        imageHeight: height,
         sortOrder: existing + addedImages
       });
       addedImages += 1;
@@ -73,9 +108,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ project
       const zipBuffer = Buffer.from(arr);
 
       const zipName = `${projectId}-${randomUUID()}.zip`;
-      const zipPath = path.join(assetDir, zipName);
-      await fs.writeFile(zipPath, zipBuffer);
-      addAsset({
+      const zipPath = await writeStorageObject({
+        category: "assets",
+        projectId,
+        fileName: zipName,
+        body: zipBuffer,
+        contentType: "application/zip"
+      });
+      await addAsset({
         projectId,
         kind: "zip",
         filePath: zipPath,
@@ -97,8 +137,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ project
         const entryBuffer = entry.getData();
         const entryExt = path.extname(entry.entryName).toLowerCase() || ".bin";
         const fileName = `${projectId}-${randomUUID()}${entryExt}`;
-        const target = path.join(assetDir, fileName);
-        await fs.writeFile(target, entryBuffer);
+        const target = await writeStorageObject({
+          category: "assets",
+          projectId,
+          fileName,
+          body: entryBuffer
+        });
 
         const mimeType =
           entryExt === ".png"
@@ -110,12 +154,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ project
                 : entryExt === ".gif"
                   ? "image/gif"
                   : "image/svg+xml";
+        const { width, height } = readDimensions(entryBuffer);
 
-        addAsset({
+        await addAsset({
           projectId,
           kind: "image",
           filePath: target,
           mimeType,
+          imageWidth: width,
+          imageHeight: height,
           sortOrder: existing + addedImages
         });
         addedImages += 1;
@@ -127,6 +174,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ project
     return NextResponse.json({ error: "No supported images found. Upload image files or a zip containing images." }, { status: 400 });
   }
 
-  setProjectStatus(projectId, "uploaded");
-  return NextResponse.json(getProjectView(projectId), { status: 201 });
+  await setProjectStatus(projectId, "uploaded");
+  return NextResponse.json(await getProjectView(projectId), { status: 201 });
 }

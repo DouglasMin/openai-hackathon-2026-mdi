@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
-  if (!getProject(projectId)) {
+  if (!(await getProject(projectId))) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
@@ -17,6 +17,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pro
     return NextResponse.json({ error: "assetIds is required" }, { status: 400 });
   }
 
-  reorderAssets(projectId, assetIds);
-  return NextResponse.json(getProjectView(projectId));
+  await reorderAssets(projectId, assetIds);
+  return NextResponse.json(await getProjectView(projectId));
 }

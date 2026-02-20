@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const stepSchema = z.object({
   step_no: z.number().int().min(1),
+  asset_index: z.number().int().min(0),
   title: z.string().min(1),
   instruction: z.string().min(1),
   highlight: z.object({
@@ -35,6 +36,7 @@ export const tutorialJsonSchema = {
           type: "object",
           properties: {
             step_no: { type: "integer", minimum: 1 },
+            asset_index: { type: "integer", minimum: 0 },
             title: { type: "string" },
             instruction: { type: "string" },
             highlight: {
@@ -51,7 +53,7 @@ export const tutorialJsonSchema = {
             tts_script: { type: "string" },
             notes: { type: "string" }
           },
-          required: ["step_no", "title", "instruction", "highlight", "tts_script", "notes"],
+          required: ["step_no", "asset_index", "title", "instruction", "highlight", "tts_script", "notes"],
           additionalProperties: false
         }
       }
