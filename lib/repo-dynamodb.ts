@@ -79,56 +79,14 @@ function deriveTableName(projectsTable: string, suffix: string): string {
   return `${projectsTable}-${suffix}`;
 }
 
-function inferTablePrefixFromBucket(): string {
-  const fromBucket = cleanEnv(process.env.APP_S3_BUCKET);
-  if (!fromBucket) return "";
-  const stripped = fromBucket.endsWith("-assets") ? fromBucket.slice(0, -"-assets".length) : fromBucket;
-  const suffix = "-863518440691";
-  if (stripped.endsWith(suffix)) {
-    return stripped.slice(0, -suffix.length);
-  }
-  return stripped;
-}
-
-function inferTablePrefix(): string {
-  const explicitPrefix = cleanEnv(process.env.DDB_TABLE_PREFIX);
-  if (explicitPrefix) return explicitPrefix;
-
-  const fromProjects = cleanEnv(process.env.DDB_PROJECTS_TABLE);
-  if (fromProjects && fromProjects.endsWith("-projects")) {
-    return fromProjects.slice(0, -"-projects".length);
-  }
-
-  const fromBucket = inferTablePrefixFromBucket();
-  if (fromBucket) return fromBucket;
-
-  // Final fallback for this project's Terraform naming convention.
-  return "flowtutor-prod";
-}
-
-function inferProjectsTableName(): string {
-  const prefix = inferTablePrefix();
-  return prefix ? `${prefix}-projects` : "";
-}
-
 function getConfig(): DdbConfig {
   if (cachedConfig) return cachedConfig;
 
-  const projectsTable = cleanEnv(process.env.DDB_PROJECTS_TABLE) || inferProjectsTableName();
-  const tablePrefix = inferTablePrefix();
-  const stepsTable =
-    cleanEnv(process.env.DDB_STEPS_TABLE) || (projectsTable ? deriveTableName(projectsTable, "steps") : `${tablePrefix}-steps`);
-  const assetsTable =
-    cleanEnv(process.env.DDB_ASSETS_TABLE) ||
-    (projectsTable ? deriveTableName(projectsTable, "assets-meta") : `${tablePrefix}-assets-meta`);
+  const projectsTable = cleanEnv(process.env.DDB_PROJECTS_TABLE);
+  const stepsTable = cleanEnv(process.env.DDB_STEPS_TABLE);
+  const assetsTable = cleanEnv(process.env.DDB_ASSETS_TABLE);
   if (!projectsTable || !stepsTable || !assetsTable) {
-    throw new Error(
-      [
-        "DynamoDB table config missing.",
-        `resolved: projects='${projectsTable}', steps='${stepsTable}', assets='${assetsTable}'.`,
-        "required env: DDB_PROJECTS_TABLE, DDB_STEPS_TABLE, DDB_ASSETS_TABLE."
-      ].join(" ")
-    );
+    throw new Error("DB_BACKEND=dynamodb requires DDB_PROJECTS_TABLE, DDB_STEPS_TABLE, DDB_ASSETS_TABLE.");
   }
 
   cachedConfig = {
@@ -138,8 +96,7 @@ function getConfig(): DdbConfig {
     scanRunsTable: cleanEnv(process.env.DDB_SCAN_RUNS_TABLE) || deriveTableName(projectsTable, "scan-runs"),
     issuesTable: cleanEnv(process.env.DDB_ISSUES_TABLE) || deriveTableName(projectsTable, "issues"),
     scoreSummaryTable: cleanEnv(process.env.DDB_SCORE_SUMMARY_TABLE) || deriveTableName(projectsTable, "score-summary"),
-    scormCloudRegsTable:
-      cleanEnv(process.env.DDB_SCORM_REG_TABLE) || deriveTableName(projectsTable, "scorm-cloud-registrations")
+    scormCloudRegsTable: cleanEnv(process.env.DDB_SCORM_REG_TABLE) || deriveTableName(projectsTable, "scorm-cloud-registrations")
   };
   return cachedConfig;
 }

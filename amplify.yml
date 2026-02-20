@@ -10,6 +10,12 @@ frontend:
         - rm -f .env.runtime
         - touch .env.production
         - env | grep -E '^(APP_AWS_REGION|APP_S3_|DB_BACKEND|DDB_|STORAGE_BACKEND|OPENAI_|ENABLE_TTS|SCORM_CLOUD_|NODE_ENV)=' >> .env.production
+        - grep '^APP_AWS_REGION=' .env.production
+        - grep '^APP_S3_BUCKET=' .env.production
+        - grep '^DB_BACKEND=' .env.production
+        - grep '^DDB_PROJECTS_TABLE=' .env.production
+        - grep '^DDB_STEPS_TABLE=' .env.production
+        - grep '^DDB_ASSETS_TABLE=' .env.production
         - cp .env.production .env.runtime
         - npm run build
         - cp .env.production .next/.env.production

@@ -21,10 +21,6 @@ export function cleanEnv(value: string | undefined): string {
   return clean(value);
 }
 
-function inAwsRuntime(): boolean {
-  return Boolean(process.env.AWS_EXECUTION_ENV || process.env.AWS_REGION || process.env.APP_AWS_REGION);
-}
-
 export function isDynamoDbEnabled(): boolean {
   const backend = norm(process.env.DB_BACKEND);
   const hasTables = Boolean(
@@ -32,9 +28,7 @@ export function isDynamoDbEnabled(): boolean {
   );
   if (backend === "dynamodb") return true;
   if (backend === "sqlite") return false;
-  if (hasTables) return true;
-  if (inAwsRuntime()) return true;
-  return false;
+  return hasTables;
 }
 
 export function isS3StorageEnabled(): boolean {
