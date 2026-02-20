@@ -64,3 +64,14 @@ iac/.terraform/
 iac/.terraform.lock.hcl
 *.tfvars
 *.tfvars.json
+
+# Terraform plans
+*.tfplan
+tfplan
+iac/tfplan
+
+# Local planning/demo docs (not part of deployable app)
+check-project.md
+demo_input_prompts*.md
+flowtutor_refactor_issue.md
+mid_sprint_checklist.md
