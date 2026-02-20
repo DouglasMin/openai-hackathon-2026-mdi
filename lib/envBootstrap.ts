@@ -29,7 +29,20 @@ export function bootstrapEnvFromFile(): void {
   if (bootstrapped) return;
   bootstrapped = true;
 
-  const candidates = [path.join(process.cwd(), ".env.production"), path.join(process.cwd(), ".next", ".env.production")];
+  const candidates = [
+    path.join(process.cwd(), ".env.production"),
+    path.join(process.cwd(), ".env.runtime"),
+    path.join(process.cwd(), ".next", ".env.production"),
+    path.join(process.cwd(), ".next", "env.production"),
+    path.join(process.cwd(), ".next", "standalone", ".env.production"),
+    path.join(process.cwd(), ".amplify-hosting", "compute", "default", ".env.production"),
+    path.join(process.cwd(), ".amplify-hosting", "compute", "default", ".env.runtime"),
+    path.join("/var", "task", ".env.production"),
+    path.join("/var", "task", ".env.runtime"),
+    path.join("/var", "task", ".next", ".env.production"),
+    path.join("/var", "task", ".next", "env.production"),
+    path.join("/var", "task", ".next", "standalone", ".env.production")
+  ];
 
   for (const file of candidates) {
     if (!fs.existsSync(file)) continue;
@@ -42,9 +55,24 @@ export function bootstrapEnvFromFile(): void {
           process.env[parsed.key] = parsed.value;
         }
       }
+      // Bridge app-prefixed envs to AWS SDK default names.
+      const appAccessKey = process.env.APP_AWS_ACCESS_KEY_ID;
+      const appSecretKey = process.env.APP_AWS_SECRET_ACCESS_KEY;
+      const appRegion = process.env.APP_AWS_REGION;
+      if (!process.env.AWS_ACCESS_KEY_ID && appAccessKey) process.env.AWS_ACCESS_KEY_ID = appAccessKey;
+      if (!process.env.AWS_SECRET_ACCESS_KEY && appSecretKey) process.env.AWS_SECRET_ACCESS_KEY = appSecretKey;
+      if (!process.env.AWS_REGION && appRegion) process.env.AWS_REGION = appRegion;
       return;
     } catch {
       // Ignore file parse errors and continue with existing process.env.
     }
   }
+
+  // Bridge app-prefixed envs even when no env file was found.
+  const appAccessKey = process.env.APP_AWS_ACCESS_KEY_ID;
+  const appSecretKey = process.env.APP_AWS_SECRET_ACCESS_KEY;
+  const appRegion = process.env.APP_AWS_REGION;
+  if (!process.env.AWS_ACCESS_KEY_ID && appAccessKey) process.env.AWS_ACCESS_KEY_ID = appAccessKey;
+  if (!process.env.AWS_SECRET_ACCESS_KEY && appSecretKey) process.env.AWS_SECRET_ACCESS_KEY = appSecretKey;
+  if (!process.env.AWS_REGION && appRegion) process.env.AWS_REGION = appRegion;
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createProject, listProjects } from "@/lib/repo";
-import { isDynamoDbEnabled, isS3StorageEnabled } from "@/lib/runtimeConfig";
+import { cleanEnv, isDynamoDbEnabled, isS3StorageEnabled } from "@/lib/runtimeConfig";
 import { getProjectView } from "@/lib/view";
 
 export const runtime = "nodejs";
@@ -8,7 +8,10 @@ export const runtime = "nodejs";
 function runtimeMeta() {
   return {
     dbBackend: isDynamoDbEnabled() ? "dynamodb" : "sqlite",
-    storageBackend: isS3StorageEnabled() ? "s3" : "local"
+    storageBackend: isS3StorageEnabled() ? "s3" : "local",
+    hasAwsAccessKey: Boolean(cleanEnv(process.env.APP_AWS_ACCESS_KEY_ID) || cleanEnv(process.env.AWS_ACCESS_KEY_ID)),
+    hasAwsSecretKey: Boolean(cleanEnv(process.env.APP_AWS_SECRET_ACCESS_KEY) || cleanEnv(process.env.AWS_SECRET_ACCESS_KEY)),
+    awsRegion: cleanEnv(process.env.APP_AWS_REGION) || cleanEnv(process.env.AWS_REGION) || null
   };
 }
 
