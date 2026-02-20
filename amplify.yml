@@ -9,13 +9,13 @@ frontend:
         - rm -f .env.production
         - rm -f .env.runtime
         - touch .env.production
-        - env | grep -E '^(FLOWTUTOR_|APP_AWS_REGION|APP_S3_|DB_BACKEND|DDB_|STORAGE_BACKEND|OPENAI_|ENABLE_TTS|SCORM_CLOUD_|NODE_ENV)=' >> .env.production
-        - grep '^APP_AWS_REGION=' .env.production
-        - grep -E '^(FLOWTUTOR_ASSETS_BUCKET|APP_S3_BUCKET)=' .env.production
-        - grep '^DB_BACKEND=' .env.production
-        - grep '^DDB_PROJECTS_TABLE=' .env.production
-        - grep '^DDB_STEPS_TABLE=' .env.production
-        - grep '^DDB_ASSETS_TABLE=' .env.production
+        - for key in FLOWTUTOR_ASSETS_BUCKET FLOWTUTOR_AWS_REGION APP_AWS_REGION APP_S3_BUCKET APP_S3_PREFIX DB_BACKEND DDB_PROJECTS_TABLE DDB_STEPS_TABLE DDB_ASSETS_TABLE DDB_SCAN_RUNS_TABLE DDB_ISSUES_TABLE DDB_SCORE_SUMMARY_TABLE DDB_SCORM_REG_TABLE STORAGE_BACKEND OPENAI_API_KEY OPENAI_MODEL OPENAI_TTS_MODEL OPENAI_TTS_VOICE ENABLE_TTS SCORM_CLOUD_APP_ID SCORM_CLOUD_BASE_URL SCORM_CLOUD_SECRET NODE_ENV; do val="$(printenv "$key" || true)"; if [ -n "$val" ]; then printf '%s=%s\n' "$key" "$val" >> .env.production; fi; done
+        - grep '^APP_AWS_REGION=' .env.production >/dev/null
+        - grep -E '^(FLOWTUTOR_ASSETS_BUCKET|APP_S3_BUCKET)=' .env.production >/dev/null
+        - grep '^DB_BACKEND=' .env.production >/dev/null
+        - grep '^DDB_PROJECTS_TABLE=' .env.production >/dev/null
+        - grep '^DDB_STEPS_TABLE=' .env.production >/dev/null
+        - grep '^DDB_ASSETS_TABLE=' .env.production >/dev/null
         - cp .env.production .env.runtime
         - npm run build
         - cp .env.production .next/.env.production
