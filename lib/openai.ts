@@ -28,23 +28,29 @@ export async function generateTutorialFromAssets(assets: AssetRecord[], workflow
     "Highlight coordinates are PIXELS relative to the full image with origin at top-left: {x,y,w,h}.\n" +
     "If unsure about bbox, set highlight to {x:0,y:0,w:0,h:0} and explain uncertainty in notes.";
 
-  const content: Array<{ type: "input_text"; text: string } | { type: "input_image"; image_url: string; detail: "auto" }> = [
+  const detail: "auto" | "low" | "high" =
+    process.env.OPENAI_IMAGE_DETAIL === "high" ? "high" : process.env.OPENAI_IMAGE_DETAIL === "low" ? "low" : "auto";
+
+  const content: Array<{ type: "input_text"; text: string } | { type: "input_image"; image_url: string; detail: "auto" | "low" | "high" }> = [
     {
       type: "input_text",
       text: `language=ko-KR; workflow_name=${workflowName}; image_count=${assets.length}`
     }
   ];
 
-  for (const asset of assets) {
-    const file = await readStorageObject(asset.filePath);
-    content.push({
-      type: "input_image",
-      image_url: toDataUrl(asset.mimeType, file),
-      detail: "auto"
-    });
-  }
+  const imageContent = await Promise.all(
+    assets.map(async (asset) => {
+      const file = await readStorageObject(asset.filePath);
+      return {
+        type: "input_image" as const,
+        image_url: toDataUrl(asset.mimeType, file),
+        detail
+      };
+    })
+  );
+  content.push(...imageContent);
 
-  const model = process.env.OPENAI_MODEL ?? "gpt-4.1";
+  const model = process.env.OPENAI_MODEL_TUTORIAL ?? "gpt-4.1-mini";
 
   const response = await openai.responses.create({
     model,
@@ -60,7 +66,8 @@ export async function generateTutorialFromAssets(assets: AssetRecord[], workflow
         type: "json_schema",
         ...tutorialJsonSchema
       }
-    }
+    },
+    max_output_tokens: 1800
   });
 
   const outputText = response.output_text;

@@ -5,7 +5,15 @@ import Image from "next/image";
 import { useToast } from "@/app/components/toast";
 
 type AssetView = { id: string; url: string; sortOrder: number; mimeType: string; kind: "image" | "audio" | "zip" };
-type StepView = { id: string; stepNo: number; title: string; instruction: string; highlight: { x: number; y: number; w: number; h: number }; assetUrl: string | null };
+type StepView = {
+  id: string;
+  stepNo: number;
+  title: string;
+  instruction: string;
+  highlight: { x: number; y: number; w: number; h: number };
+  assetUrl: string | null;
+  ttsUrl?: string | null;
+};
 type ScormCloudView = {
   projectId: string;
   courseId: string;
@@ -42,7 +50,9 @@ export default function HomePage() {
   );
   const statusMeta = useMemo(() => getStatusMeta(project?.project.status ?? "uploaded"), [project?.project.status]);
   const hasSteps = (project?.steps.length ?? 0) > 0;
+  const ttsReadyCount = useMemo(() => (project?.steps ?? []).filter((step) => Boolean(step.ttsUrl)).length, [project?.steps]);
   const canGenerate = orderedAssets.length > 0 && busy !== "generate";
+  const canGenerateTts = hasSteps && busy !== "tts";
   const canExport = project?.project.status === "ready" && busy !== "export";
   const canScormCloudSync = project?.project.status === "exported" && busy !== "scorm-cloud-sync";
   const canScormCloudRefresh = Boolean(project?.scormCloud) && busy !== "scorm-cloud-refresh";
@@ -199,6 +209,47 @@ export default function HomePage() {
     }
   }
 
+  async function generateTts() {
+    if (!project) return;
+    setBusy("tts");
+    const loadingId = showToast({ tone: "loading", message: "TTS 생성 중..." });
+    try {
+      let remaining = Number.POSITIVE_INFINITY;
+      let generatedTotal = 0;
+      let round = 0;
+
+      while (remaining > 0 && round < 20) {
+        round += 1;
+        const res = await fetch(`/api/projects/${project.project.id}/tts?limit=2`, { method: "POST" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showToast({ tone: "error", message: data?.error ?? "TTS 생성 실패" });
+          return;
+        }
+
+        const generated = Number(data?.generated ?? 0);
+        remaining = Number(data?.remaining ?? 0);
+        generatedTotal += generated;
+
+        if (generated === 0) {
+          break;
+        }
+      }
+
+      await refresh(project.project.id);
+      if (remaining > 0) {
+        showToast({ tone: "success", message: `TTS 일부 생성 완료 (${generatedTotal}개). 다시 실행하면 이어서 생성됩니다.` });
+      } else {
+        showToast({ tone: "success", message: `TTS 생성 완료 (${generatedTotal}개)` });
+      }
+    } catch {
+      showToast({ tone: "error", message: "TTS 생성 실패" });
+    } finally {
+      dismissToast(loadingId);
+      setBusy(null);
+    }
+  }
+
   async function syncScormCloud() {
     if (!project) return;
     setScormSyncUiState("syncing");
@@ -313,6 +364,9 @@ export default function HomePage() {
           <input type="file" accept="image/*,.zip,application/zip" multiple onChange={(e) => void upload(e.target.files)} disabled={busy === "upload"} />
           <button className="btn primary" onClick={() => void generate()} disabled={!canGenerate}>
             AI 단계 생성
+          </button>
+          <button className="btn ghost" onClick={() => void generateTts()} disabled={!canGenerateTts}>
+            {busy === "tts" ? "TTS 생성 중..." : `TTS 생성 (${ttsReadyCount}/${project.steps.length})`}
           </button>
           <button className="btn ghost" onClick={() => void exportScorm()} disabled={!canExport}>
             SCORM 내보내기(zip)
