@@ -70,6 +70,9 @@ iac/.terraform.lock.hcl
 tfplan
 iac/tfplan
 
+# Ignore entire IaC workspace
+iac/
+
 # Local planning/demo docs (not part of deployable app)
 check-project.md
 demo_input_prompts*.md
