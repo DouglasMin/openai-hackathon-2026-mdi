@@ -10,6 +10,7 @@ frontend:
         - touch .env.production
         - env | grep -E '^(APP_AWS_|APP_S3_|DB_BACKEND|DDB_|STORAGE_BACKEND|OPENAI_|ENABLE_TTS|SCORM_CLOUD_|NODE_ENV)=' >> .env.production
         - npm run build
+        - cp .env.production .next/.env.production
   artifacts:
     baseDirectory: .next
     files:

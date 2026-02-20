@@ -25,7 +25,7 @@ import type {
   StepRecord,
   TutorialSchema
 } from "@/lib/types";
-import { readCleanEnv } from "@/lib/runtimeConfig";
+import { cleanEnv } from "@/lib/runtimeConfig";
 
 type DdbConfig = {
   projectsTable: string;
@@ -69,15 +69,15 @@ function asBoolean(value: unknown): boolean {
 }
 
 function getRegion(): string {
-  return readCleanEnv("APP_AWS_REGION") || readCleanEnv("AWS_REGION");
+  return cleanEnv(process.env.APP_AWS_REGION) || cleanEnv(process.env.AWS_REGION);
 }
 
 function getAccessKeyId(): string | undefined {
-  return readCleanEnv("APP_AWS_ACCESS_KEY_ID") || readCleanEnv("AWS_ACCESS_KEY_ID") || undefined;
+  return cleanEnv(process.env.APP_AWS_ACCESS_KEY_ID) || cleanEnv(process.env.AWS_ACCESS_KEY_ID) || undefined;
 }
 
 function getSecretAccessKey(): string | undefined {
-  return readCleanEnv("APP_AWS_SECRET_ACCESS_KEY") || readCleanEnv("AWS_SECRET_ACCESS_KEY") || undefined;
+  return cleanEnv(process.env.APP_AWS_SECRET_ACCESS_KEY) || cleanEnv(process.env.AWS_SECRET_ACCESS_KEY) || undefined;
 }
 
 function deriveTableName(projectsTable: string, suffix: string): string {
@@ -88,7 +88,7 @@ function deriveTableName(projectsTable: string, suffix: string): string {
 }
 
 function inferTablePrefixFromBucket(): string {
-  const fromBucket = readCleanEnv("APP_S3_BUCKET");
+  const fromBucket = cleanEnv(process.env.APP_S3_BUCKET);
   if (!fromBucket) return "";
   const stripped = fromBucket.endsWith("-assets") ? fromBucket.slice(0, -"-assets".length) : fromBucket;
   const suffix = "-863518440691";
@@ -99,10 +99,10 @@ function inferTablePrefixFromBucket(): string {
 }
 
 function inferTablePrefix(): string {
-  const explicitPrefix = readCleanEnv("DDB_TABLE_PREFIX");
+  const explicitPrefix = cleanEnv(process.env.DDB_TABLE_PREFIX);
   if (explicitPrefix) return explicitPrefix;
 
-  const fromProjects = readCleanEnv("DDB_PROJECTS_TABLE");
+  const fromProjects = cleanEnv(process.env.DDB_PROJECTS_TABLE);
   if (fromProjects && fromProjects.endsWith("-projects")) {
     return fromProjects.slice(0, -"-projects".length);
   }
@@ -122,11 +122,13 @@ function inferProjectsTableName(): string {
 function getConfig(): DdbConfig {
   if (cachedConfig) return cachedConfig;
 
-  const projectsTable = readCleanEnv("DDB_PROJECTS_TABLE") || inferProjectsTableName();
+  const projectsTable = cleanEnv(process.env.DDB_PROJECTS_TABLE) || inferProjectsTableName();
   const tablePrefix = inferTablePrefix();
-  const stepsTable = readCleanEnv("DDB_STEPS_TABLE") || (projectsTable ? deriveTableName(projectsTable, "steps") : `${tablePrefix}-steps`);
+  const stepsTable =
+    cleanEnv(process.env.DDB_STEPS_TABLE) || (projectsTable ? deriveTableName(projectsTable, "steps") : `${tablePrefix}-steps`);
   const assetsTable =
-    readCleanEnv("DDB_ASSETS_TABLE") || (projectsTable ? deriveTableName(projectsTable, "assets-meta") : `${tablePrefix}-assets-meta`);
+    cleanEnv(process.env.DDB_ASSETS_TABLE) ||
+    (projectsTable ? deriveTableName(projectsTable, "assets-meta") : `${tablePrefix}-assets-meta`);
   if (!projectsTable || !stepsTable || !assetsTable) {
     throw new Error(
       [
@@ -141,10 +143,11 @@ function getConfig(): DdbConfig {
     projectsTable,
     stepsTable,
     assetsTable,
-    scanRunsTable: readCleanEnv("DDB_SCAN_RUNS_TABLE") || deriveTableName(projectsTable, "scan-runs"),
-    issuesTable: readCleanEnv("DDB_ISSUES_TABLE") || deriveTableName(projectsTable, "issues"),
-    scoreSummaryTable: readCleanEnv("DDB_SCORE_SUMMARY_TABLE") || deriveTableName(projectsTable, "score-summary"),
-    scormCloudRegsTable: readCleanEnv("DDB_SCORM_REG_TABLE") || deriveTableName(projectsTable, "scorm-cloud-registrations")
+    scanRunsTable: cleanEnv(process.env.DDB_SCAN_RUNS_TABLE) || deriveTableName(projectsTable, "scan-runs"),
+    issuesTable: cleanEnv(process.env.DDB_ISSUES_TABLE) || deriveTableName(projectsTable, "issues"),
+    scoreSummaryTable: cleanEnv(process.env.DDB_SCORE_SUMMARY_TABLE) || deriveTableName(projectsTable, "score-summary"),
+    scormCloudRegsTable:
+      cleanEnv(process.env.DDB_SCORM_REG_TABLE) || deriveTableName(projectsTable, "scorm-cloud-registrations")
   };
   return cachedConfig;
 }

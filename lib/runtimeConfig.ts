@@ -1,3 +1,7 @@
+import { bootstrapEnvFromFile } from "@/lib/envBootstrap";
+
+bootstrapEnvFromFile();
+
 function clean(value: string | undefined): string {
   const trimmed = (value ?? "").trim();
   if (
@@ -11,6 +15,10 @@ function clean(value: string | undefined): string {
 
 function norm(value: string | undefined): string {
   return clean(value).toLowerCase();
+}
+
+export function cleanEnv(value: string | undefined): string {
+  return clean(value);
 }
 
 function inAwsRuntime(): boolean {
@@ -38,8 +46,4 @@ export function isS3StorageEnabled(): boolean {
 
 export function normalizedStorageBackend(): "s3" | "local" {
   return isS3StorageEnabled() ? "s3" : "local";
-}
-
-export function readCleanEnv(name: string): string {
-  return clean(process.env[name]);
 }
