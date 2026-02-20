@@ -10,15 +10,17 @@ export type StorageCategory = "assets" | "exports" | "qa" | "vpat";
 type StorageBackend = "local" | "s3";
 
 const storageBackend: StorageBackend = normalizedStorageBackend();
-const s3Region = cleanEnv(process.env.APP_AWS_REGION) || cleanEnv(process.env.AWS_REGION);
-const s3Bucket = cleanEnv(process.env.APP_S3_BUCKET) || cleanEnv(process.env.AWS_S3_BUCKET);
+const s3Region =
+  cleanEnv(process.env.FLOWTUTOR_AWS_REGION) || cleanEnv(process.env.APP_AWS_REGION) || cleanEnv(process.env.AWS_REGION);
+const s3Bucket =
+  cleanEnv(process.env.FLOWTUTOR_ASSETS_BUCKET) || cleanEnv(process.env.APP_S3_BUCKET) || cleanEnv(process.env.AWS_S3_BUCKET);
 const s3Prefix = (cleanEnv(process.env.APP_S3_PREFIX) || cleanEnv(process.env.AWS_S3_PREFIX)).replace(/^\/+|\/+$/g, "");
 
 let cachedS3: S3Client | null = null;
 
 function assertS3Config(): void {
   if (!s3Region || !s3Bucket) {
-    throw new Error("S3 storage is enabled but APP_AWS_REGION/APP_S3_BUCKET env is missing.");
+    throw new Error("S3 storage is enabled but region/bucket env is missing (FLOWTUTOR_ASSETS_BUCKET or APP_S3_BUCKET).");
   }
 }
 
