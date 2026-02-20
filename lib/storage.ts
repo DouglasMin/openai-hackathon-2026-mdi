@@ -8,7 +8,8 @@ export type StorageCategory = "assets" | "exports" | "qa" | "vpat";
 
 type StorageBackend = "local" | "s3";
 
-const storageBackend: StorageBackend = process.env.STORAGE_BACKEND === "s3" ? "s3" : "local";
+const normalizedStorageBackend = (process.env.STORAGE_BACKEND ?? "").trim().toLowerCase();
+const storageBackend: StorageBackend = normalizedStorageBackend === "s3" ? "s3" : "local";
 const s3Region = process.env.APP_AWS_REGION ?? process.env.AWS_REGION ?? "";
 const s3Bucket = process.env.APP_S3_BUCKET ?? process.env.AWS_S3_BUCKET ?? "";
 const s3Prefix = (process.env.APP_S3_PREFIX ?? process.env.AWS_S3_PREFIX ?? "").trim().replace(/^\/+|\/+$/g, "");

@@ -1,10 +1,11 @@
 type RepoApi = typeof import("@/lib/repo-dynamodb");
 
 let cachedRepoPromise: Promise<RepoApi> | null = null;
+const normalizedDbBackend = (process.env.DB_BACKEND ?? "").trim().toLowerCase();
 
 async function resolveRepo(): Promise<RepoApi> {
   if (cachedRepoPromise) return cachedRepoPromise;
-  if (process.env.DB_BACKEND === "dynamodb") {
+  if (normalizedDbBackend === "dynamodb") {
     cachedRepoPromise = import("./repo-dynamodb") as Promise<RepoApi>;
     return cachedRepoPromise;
   }
