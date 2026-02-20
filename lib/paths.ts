@@ -1,10 +1,9 @@
 import path from "node:path";
 import fs from "node:fs";
+import { isDynamoDbEnabled, isS3StorageEnabled } from "@/lib/runtimeConfig";
 
 const rootDir = process.cwd();
-const normalizedStorageBackend = (process.env.STORAGE_BACKEND ?? "").trim().toLowerCase();
-const normalizedDbBackend = (process.env.DB_BACKEND ?? "").trim().toLowerCase();
-const shouldUseTmpData = normalizedStorageBackend === "s3" || normalizedDbBackend === "dynamodb";
+const shouldUseTmpData = isS3StorageEnabled() || isDynamoDbEnabled();
 const dataDir = shouldUseTmpData ? path.join("/tmp", "flowtutor-data") : path.join(rootDir, "data");
 const assetDir = path.join(dataDir, "assets");
 const exportDir = path.join(dataDir, "exports");

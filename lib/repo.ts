@@ -1,14 +1,18 @@
 type RepoApi = typeof import("@/lib/repo-dynamodb");
+import { isDynamoDbEnabled } from "@/lib/runtimeConfig";
 
 let cachedRepoPromise: Promise<RepoApi> | null = null;
-const normalizedDbBackend = (process.env.DB_BACKEND ?? "").trim().toLowerCase();
 
 async function resolveRepo(): Promise<RepoApi> {
   if (cachedRepoPromise) return cachedRepoPromise;
-  if (normalizedDbBackend === "dynamodb") {
+
+  if (isDynamoDbEnabled()) {
+    console.info("[repo] backend=dynamodb");
     cachedRepoPromise = import("./repo-dynamodb") as Promise<RepoApi>;
     return cachedRepoPromise;
   }
+
+  console.info("[repo] backend=sqlite");
   cachedRepoPromise = import("./repo-sqlite-async") as Promise<RepoApi>;
   return cachedRepoPromise;
 }
