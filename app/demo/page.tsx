@@ -49,16 +49,25 @@ export default function HomePage() {
 
   const create = useCallback(async () => {
     setBusy("create");
-    const res = await fetch("/api/projects", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: "업무 프로세스 튜토리얼" })
-    });
-    const data = await res.json();
-    setProject(data.project);
-    setTitle(data?.project?.project?.title ?? "업무 프로세스 튜토리얼");
-    setBusy(null);
-  }, []);
+    try {
+      const res = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "업무 프로세스 튜토리얼" })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.project) {
+        showToast({ tone: "error", message: data?.error ?? "프로젝트 생성 실패" });
+        return;
+      }
+      setProject(data.project);
+      setTitle(data?.project?.project?.title ?? "업무 프로세스 튜토리얼");
+    } catch {
+      showToast({ tone: "error", message: "프로젝트 생성 실패" });
+    } finally {
+      setBusy(null);
+    }
+  }, [showToast]);
 
   useEffect(() => {
     void create();
@@ -78,7 +87,11 @@ export default function HomePage() {
     Array.from(files).forEach((f) => form.append("files", f));
     try {
       const res = await fetch(`/api/projects/${project.project.id}/assets`, { method: "POST", body: form });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.project) {
+        showToast({ tone: "error", message: data?.error ?? "업로드 실패" });
+        return;
+      }
       setProject(data);
       showToast({ tone: "success", message: "업로드 완료" });
     } catch {
@@ -138,7 +151,12 @@ export default function HomePage() {
     const loadingId = showToast({ tone: "loading", message: "AI 단계 생성 중..." });
     try {
       const res = await fetch(`/api/projects/${project.project.id}/generate`, { method: "POST" });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        showToast({ tone: "error", message: data?.error ?? "AI 생성 실패" });
+        return;
+      }
 
       if (data.ok) {
         setProject(data.project);

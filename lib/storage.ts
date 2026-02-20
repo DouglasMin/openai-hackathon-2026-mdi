@@ -3,18 +3,18 @@ import path from "node:path";
 import { Readable } from "node:stream";
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { assetDir, exportDir } from "@/lib/paths";
-import { normalizedStorageBackend } from "@/lib/runtimeConfig";
+import { normalizedStorageBackend, readCleanEnv } from "@/lib/runtimeConfig";
 
 export type StorageCategory = "assets" | "exports" | "qa" | "vpat";
 
 type StorageBackend = "local" | "s3";
 
 const storageBackend: StorageBackend = normalizedStorageBackend();
-const s3Region = process.env.APP_AWS_REGION ?? process.env.AWS_REGION ?? "";
-const s3Bucket = process.env.APP_S3_BUCKET ?? process.env.AWS_S3_BUCKET ?? "";
-const s3Prefix = (process.env.APP_S3_PREFIX ?? process.env.AWS_S3_PREFIX ?? "").trim().replace(/^\/+|\/+$/g, "");
-const s3AccessKeyId = process.env.APP_AWS_ACCESS_KEY_ID ?? process.env.AWS_ACCESS_KEY_ID;
-const s3SecretAccessKey = process.env.APP_AWS_SECRET_ACCESS_KEY ?? process.env.AWS_SECRET_ACCESS_KEY;
+const s3Region = readCleanEnv("APP_AWS_REGION") || readCleanEnv("AWS_REGION");
+const s3Bucket = readCleanEnv("APP_S3_BUCKET") || readCleanEnv("AWS_S3_BUCKET");
+const s3Prefix = (readCleanEnv("APP_S3_PREFIX") || readCleanEnv("AWS_S3_PREFIX")).replace(/^\/+|\/+$/g, "");
+const s3AccessKeyId = readCleanEnv("APP_AWS_ACCESS_KEY_ID") || readCleanEnv("AWS_ACCESS_KEY_ID") || undefined;
+const s3SecretAccessKey = readCleanEnv("APP_AWS_SECRET_ACCESS_KEY") || readCleanEnv("AWS_SECRET_ACCESS_KEY") || undefined;
 
 let cachedS3: S3Client | null = null;
 

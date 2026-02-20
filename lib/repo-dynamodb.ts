@@ -25,6 +25,7 @@ import type {
   StepRecord,
   TutorialSchema
 } from "@/lib/types";
+import { readCleanEnv } from "@/lib/runtimeConfig";
 
 type DdbConfig = {
   projectsTable: string;
@@ -68,15 +69,15 @@ function asBoolean(value: unknown): boolean {
 }
 
 function getRegion(): string {
-  return process.env.APP_AWS_REGION ?? process.env.AWS_REGION ?? "";
+  return readCleanEnv("APP_AWS_REGION") || readCleanEnv("AWS_REGION");
 }
 
 function getAccessKeyId(): string | undefined {
-  return process.env.APP_AWS_ACCESS_KEY_ID ?? process.env.AWS_ACCESS_KEY_ID;
+  return readCleanEnv("APP_AWS_ACCESS_KEY_ID") || readCleanEnv("AWS_ACCESS_KEY_ID") || undefined;
 }
 
 function getSecretAccessKey(): string | undefined {
-  return process.env.APP_AWS_SECRET_ACCESS_KEY ?? process.env.AWS_SECRET_ACCESS_KEY;
+  return readCleanEnv("APP_AWS_SECRET_ACCESS_KEY") || readCleanEnv("AWS_SECRET_ACCESS_KEY") || undefined;
 }
 
 function deriveTableName(projectsTable: string, suffix: string): string {
@@ -86,12 +87,23 @@ function deriveTableName(projectsTable: string, suffix: string): string {
   return `${projectsTable}-${suffix}`;
 }
 
+function inferProjectsTableName(): string {
+  const fromBucket = readCleanEnv("APP_S3_BUCKET");
+  if (!fromBucket) return "";
+  const stripped = fromBucket.endsWith("-assets") ? fromBucket.slice(0, -"-assets".length) : fromBucket;
+  const suffix = "-863518440691";
+  if (stripped.endsWith(suffix)) {
+    return `${stripped.slice(0, -suffix.length)}-projects`;
+  }
+  return `${stripped}-projects`;
+}
+
 function getConfig(): DdbConfig {
   if (cachedConfig) return cachedConfig;
 
-  const projectsTable = process.env.DDB_PROJECTS_TABLE?.trim() ?? "";
-  const stepsTable = process.env.DDB_STEPS_TABLE?.trim() ?? "";
-  const assetsTable = process.env.DDB_ASSETS_TABLE?.trim() ?? "";
+  const projectsTable = readCleanEnv("DDB_PROJECTS_TABLE") || inferProjectsTableName();
+  const stepsTable = readCleanEnv("DDB_STEPS_TABLE") || (projectsTable ? deriveTableName(projectsTable, "steps") : "");
+  const assetsTable = readCleanEnv("DDB_ASSETS_TABLE") || (projectsTable ? deriveTableName(projectsTable, "assets-meta") : "");
   if (!projectsTable || !stepsTable || !assetsTable) {
     throw new Error("DB_BACKEND=dynamodb requires DDB_PROJECTS_TABLE, DDB_STEPS_TABLE, DDB_ASSETS_TABLE.");
   }
@@ -100,11 +112,10 @@ function getConfig(): DdbConfig {
     projectsTable,
     stepsTable,
     assetsTable,
-    scanRunsTable: process.env.DDB_SCAN_RUNS_TABLE?.trim() || deriveTableName(projectsTable, "scan-runs"),
-    issuesTable: process.env.DDB_ISSUES_TABLE?.trim() || deriveTableName(projectsTable, "issues"),
-    scoreSummaryTable: process.env.DDB_SCORE_SUMMARY_TABLE?.trim() || deriveTableName(projectsTable, "score-summary"),
-    scormCloudRegsTable:
-      process.env.DDB_SCORM_REG_TABLE?.trim() || deriveTableName(projectsTable, "scorm-cloud-registrations")
+    scanRunsTable: readCleanEnv("DDB_SCAN_RUNS_TABLE") || deriveTableName(projectsTable, "scan-runs"),
+    issuesTable: readCleanEnv("DDB_ISSUES_TABLE") || deriveTableName(projectsTable, "issues"),
+    scoreSummaryTable: readCleanEnv("DDB_SCORE_SUMMARY_TABLE") || deriveTableName(projectsTable, "score-summary"),
+    scormCloudRegsTable: readCleanEnv("DDB_SCORM_REG_TABLE") || deriveTableName(projectsTable, "scorm-cloud-registrations")
   };
   return cachedConfig;
 }
