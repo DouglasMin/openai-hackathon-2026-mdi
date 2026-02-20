@@ -9,7 +9,7 @@ frontend:
         - rm -f .env.production
         - rm -f .env.runtime
         - touch .env.production
-        - env | grep -E '^(APP_AWS_|APP_S3_|DB_BACKEND|DDB_|STORAGE_BACKEND|OPENAI_|ENABLE_TTS|SCORM_CLOUD_|NODE_ENV)=' >> .env.production
+        - env | grep -E '^(APP_AWS_REGION|APP_S3_|DB_BACKEND|DDB_|STORAGE_BACKEND|OPENAI_|ENABLE_TTS|SCORM_CLOUD_|NODE_ENV)=' >> .env.production
         - cp .env.production .env.runtime
         - npm run build
         - cp .env.production .next/.env.production

@@ -9,8 +9,6 @@ function runtimeMeta() {
   return {
     dbBackend: isDynamoDbEnabled() ? "dynamodb" : "sqlite",
     storageBackend: isS3StorageEnabled() ? "s3" : "local",
-    hasAwsAccessKey: Boolean(cleanEnv(process.env.APP_AWS_ACCESS_KEY_ID) || cleanEnv(process.env.AWS_ACCESS_KEY_ID)),
-    hasAwsSecretKey: Boolean(cleanEnv(process.env.APP_AWS_SECRET_ACCESS_KEY) || cleanEnv(process.env.AWS_SECRET_ACCESS_KEY)),
     awsRegion: cleanEnv(process.env.APP_AWS_REGION) || cleanEnv(process.env.AWS_REGION) || null
   };
 }

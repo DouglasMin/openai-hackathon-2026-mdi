@@ -72,14 +72,6 @@ function getRegion(): string {
   return cleanEnv(process.env.APP_AWS_REGION) || cleanEnv(process.env.AWS_REGION);
 }
 
-function getAccessKeyId(): string | undefined {
-  return cleanEnv(process.env.APP_AWS_ACCESS_KEY_ID) || cleanEnv(process.env.AWS_ACCESS_KEY_ID) || undefined;
-}
-
-function getSecretAccessKey(): string | undefined {
-  return cleanEnv(process.env.APP_AWS_SECRET_ACCESS_KEY) || cleanEnv(process.env.AWS_SECRET_ACCESS_KEY) || undefined;
-}
-
 function deriveTableName(projectsTable: string, suffix: string): string {
   if (projectsTable.endsWith("-projects")) {
     return `${projectsTable.slice(0, -"-projects".length)}-${suffix}`;
@@ -159,19 +151,9 @@ function ddb(): DynamoDBDocumentClient {
   if (!region) {
     throw new Error("DynamoDB backend requires APP_AWS_REGION (or AWS_REGION).");
   }
-  const accessKeyId = getAccessKeyId();
-  const secretAccessKey = getSecretAccessKey();
 
   const low = new DynamoDBClient({
-    region,
-    ...(accessKeyId && secretAccessKey
-      ? {
-          credentials: {
-            accessKeyId,
-            secretAccessKey
-          }
-        }
-      : {})
+    region
   });
   cachedDdb = DynamoDBDocumentClient.from(low, {
     marshallOptions: { removeUndefinedValues: true }

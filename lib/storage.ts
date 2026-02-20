@@ -13,9 +13,6 @@ const storageBackend: StorageBackend = normalizedStorageBackend();
 const s3Region = cleanEnv(process.env.APP_AWS_REGION) || cleanEnv(process.env.AWS_REGION);
 const s3Bucket = cleanEnv(process.env.APP_S3_BUCKET) || cleanEnv(process.env.AWS_S3_BUCKET);
 const s3Prefix = (cleanEnv(process.env.APP_S3_PREFIX) || cleanEnv(process.env.AWS_S3_PREFIX)).replace(/^\/+|\/+$/g, "");
-const s3AccessKeyId = cleanEnv(process.env.APP_AWS_ACCESS_KEY_ID) || cleanEnv(process.env.AWS_ACCESS_KEY_ID) || undefined;
-const s3SecretAccessKey =
-  cleanEnv(process.env.APP_AWS_SECRET_ACCESS_KEY) || cleanEnv(process.env.AWS_SECRET_ACCESS_KEY) || undefined;
 
 let cachedS3: S3Client | null = null;
 
@@ -29,17 +26,8 @@ function s3Client(): S3Client {
   if (cachedS3) return cachedS3;
   assertS3Config();
 
-  const hasInlineCredential = Boolean(s3AccessKeyId && s3SecretAccessKey);
   cachedS3 = new S3Client({
-    region: s3Region,
-    ...(hasInlineCredential
-      ? {
-          credentials: {
-            accessKeyId: s3AccessKeyId as string,
-            secretAccessKey: s3SecretAccessKey as string
-          }
-        }
-      : {})
+    region: s3Region
   });
   return cachedS3;
 }
